@@ -76,6 +76,7 @@ function reopulateCart(){
     if(cartList.length > 0 && cartList !== undefined){
         cartList.forEach((data, index) => {
             try{
+                let total = 0;
                 fetch(`https://fakestoreapi.com/products/${index}`)
                 .then(resp=>resp.json())
                     .then(json=>{
@@ -97,7 +98,10 @@ function reopulateCart(){
                         </div>
                         <hr>
                     </div>`);
+                    total += json['price'];
+                    console.log(total);
                     });
+                
             }
             catch (err){
          //       console.log('error', err);
