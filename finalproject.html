@@ -25,13 +25,20 @@
 			</div>
 		</div>
 		<div id="mySidenav" class="sidenav">
+			
 			<a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+			<h1>Shopping Cart</h1>
+			<select class="form-select" aria-label="Default select example" id="selectCurrency">
+				<option selected value = "cad">Canadian Dollars</option>
+				<option value="usd">US Dollars</option>
+				<option value="gbp">British Pound</option>
+			  </select> <br>
 			<div class="container" id="cartContainer">
 			</div>
 			<div id="totalAmount">
 				<label value="testValue" id="testLabel">Test</label>
 			</div>
-
+			<input type="hidden" id="custId" name="custId" value="">
 		</div>
 		<script src="https://deepblue.camosun.bc.ca/~c0180354/ics128/final/cookie-manager.js"></script>	
 		<script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.js"></script>
