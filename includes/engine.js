@@ -25,6 +25,7 @@ function closeNav() {
 function addToCart(id){
     $("#cartContainer").empty();
     $("#totalAmount").empty();
+    $("#"+id).prop('disabled', true);
     let list = get_cookie("cartList");
     if (list === null) {
         list = {};
@@ -60,7 +61,7 @@ function populateStore(apiURL){
                             <div class="card-body">
                                 <h5 class="card-title">${data.title}</h5>
                                 <p class="card-text">${data.description}</p>
-                                <button class="btn btn-success add-to-cart-button" onclick="addToCart(${data.id}); openNav();">
+                                <button class="btn btn-success add-to-cart-button" id="${data.id}" onclick="addToCart(${data.id}); openNav();">
                                 Add to Cart</button>
                             </div>
                         </div>
@@ -106,14 +107,11 @@ function populateCart(currency){
                 $('#cartContainer').append(rowDom);
                 renderer.get_total(totalPrice.toFixed(2));
                 renderer.addDivFooter();
+                $(".add-to-cart-button").prop('disabled', false);
             });        
         }
         else{
-            $('#cartContainer').append(`<div class="row"> 
-                <div class="col-lg-12  shopping-list">
-                  <center> No items in cart </center>
-                </div>
-            </div>`);
+            renderer.renderEmptyCart();
         }
     }
     
@@ -142,15 +140,9 @@ $("#selectCurrency").on('change', async function (e) {
     $("#totalAmount").empty();
     populateCart();
 });
-class shopBuilder {
+class shopBuilder{
     constructor(){
-        this._shoppingCart
-    }
-     get renderShoppingCart(){
-        return this._shoppingCart + " The class works";
-    }    
-    set renderShoppingCart(cartItems){
-        this._shoppingCart = cartItems;
+
     }
     buildCart(item, cartList, currency){
         let sum = cartList[item['id']] * item['price'] * currency;
@@ -182,6 +174,7 @@ class shopBuilder {
         let data = fetch("https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/cad.json").
         then(response => response.json()).
             then((json) => { 
+                this._testCurrency = json["cad"][selectValue];
                 return json["cad"][selectValue];
             });
         return data;
@@ -219,5 +212,12 @@ class shopBuilder {
         </div>
         <hr class = "shopping-list">
         </div>`);
+    }
+    renderEmptyCart(){
+        $('#cartContainer').append(`<div class="row"> 
+                <div class="col-lg-12  shopping-list">
+                  <center> No items in cart </center>
+                </div>
+            </div>`);
     }
 }
