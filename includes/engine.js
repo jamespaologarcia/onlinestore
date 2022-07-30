@@ -2,15 +2,14 @@ $(document).ready(function(){
     loadData();
     closeNav();
     populateCart();
-   openNav(); 
+    openNav(); 
+    set_cookie("cartList", {});
 });
-
-
 $('.grid').masonry({
     // options
     itemSelector: '.grid-item',
     columnWidth: 200
-  });
+});
 function loadData(){
     $("#demo").empty();
     let apiURL = "https://fakestoreapi.com/products";
@@ -19,44 +18,37 @@ function loadData(){
 }
 function openNav() {
     $("#mySidenav").show();
-  }
-  
+}
 function closeNav() {
    $("#mySidenav").hide();
 }
 function addToCart(id){
+    $("#cartContainer").empty();
+    $("#totalAmount").empty();
     let list = get_cookie("cartList");
-    let itemFound = 0;
-    var indexFound;
-    if(list.length > 0){
-        for(let i = 0; i < list.length; i++){
-            if(list[i][0] == id){
-                list[i][1] ++;
-                itemFound++;
-                indexFound = i;
-            }
-        }
+    if (list === null) {
+        list = {};
     }
-    
-    if(itemFound == 0){
-        list.push([id, 1]);
+    if (list[id] === undefined) {
+        list[id] = 1;
     }
-    if(indexFound === undefined){
-        indexFound =list.length - 1;
+    else{
+    list[id]++;
     }
+    console.log(list);
     set_cookie("cartList", list);
-  populateCart();
-
+    populateCart();
 }
 function removeFromCart(id){
+    $("#cartContainer").empty();
+    $("#totalAmount").empty();
     let list = get_cookie("cartList");
-    list.splice(id, 1);
+    delete list[id];
     set_cookie("cartList", list);
     populateCart();
 }
 function populateStore(apiURL){
     let storeProducts = "";
-    cartHeaders();
     fetch(apiURL).
     then(response => response.json()).
         then((json) => {
@@ -78,57 +70,43 @@ function populateStore(apiURL){
     return storeProducts;
 }
 function emptyCart(){
-    set_cookie("cartList", []);
+    set_cookie("cartList", {});
     populateCart();
 }
 
-async function populateCart(currency){
-    let promisedCurrency = getCurrency();
+function populateCart(currency){
+    let renderer = new shopBuilder();
+    let promisedCurrency = renderer.getCurrency();
     if(currency === undefined){
         promisedCurrency.then(function(xa) {
             populateCart(xa);
          });
     }
-    else {
-        $("#cartContainer").empty();
-        $("#totalAmount").empty();
+    else {        
         let cartList = get_cookie("cartList");
+        let promiseList = []
+        let rowDom = '';
+        let totalPrice = 0;
         cartHeaders();
-        if(cartList.length > 0 && cartList !== undefined){
-            var totalPrice = 0;
-            for(let i = 0; i< cartList.length; i++){
-                let response = await fetch(`https://fakestoreapi.com/products/${cartList[i][0]}`);
-                let cartItem = await response.json();
-                let sum = (cartItem['price'] * cartList[i][1]) * currency;
-                let itemPrice = (cartItem['price'] * currency).toFixed(2);
-                $('#cartContainer').append(`<div class="row" id="row${cartList[i][0]}">
-                <div class="col-lg-2 shopping-list">
-                    <button type="button" class="btn btn-danger" onclick="removeFromCart(${i})"><span class="material-symbols-outlined">
-                    close
-                    </span></button>
-                    
-                </div>
-                <div class="col-lg-3  shopping-list">
-                    ${cartItem['title']}
-                </div>
-                <div class="col-lg-2  shopping-list">
-                    ${cartList[i][1]}
-                </div>
-                <div class="col-lg-2  shopping-list">
-                    ${itemPrice}
-                </div>
-                <div class="col-lg-3  shopping-list">
-                    ${sum.toFixed(2)}
-                </div>
-                <hr class ="shopping-list">
-                </div>`);  
-                totalPrice += sum;     
-                if(i == cartList.length - 1){
-                    get_total(totalPrice.toFixed(2))
-                    addDivFooter();
-                    
-                }                   
-            }
+        if(Object.keys(cartList).length > 0 && cartList !== undefined){
+            let count = 0;
+            Object.keys(cartList).forEach(key => {
+                cartItemTest = fetch(`https://fakestoreapi.com/products/${key}`)
+                    .then(res=>res.json())
+                        .then(json=>{
+                            return json});
+                            promiseList.push(cartItemTest);    
+            });               
+            Promise.all(promiseList).then((values) => {
+                count++;
+                values.forEach(function(item) {
+                    rowDom += renderer.buildCart(item, cartList, currency);
+                    totalPrice += item['price'] * cartList[item['id']] * currency;    
+                });
+                $('#cartContainer').append(rowDom);
+                renderer.get_total(totalPrice.toFixed(2));
+                renderer.addDivFooter();
+            });        
         }
         else{
             $('#cartContainer').append(`<div class="row"> 
@@ -139,40 +117,6 @@ async function populateCart(currency){
         }
     }
     
-}
-function addDivFooter(){
-    $('#totalAmount').append(`<div class="row shopping-list">
-    <div class="col-lg-2 shopping-list ">
-    </div>
-    <div class="col-lg-4 shopping-list ">
-    <button type="button" class="btn btn-warning" onclick="emptyCart()">Empty Cart</button>
-    </div>
-    <div class="col-lg-1 shopping-list ">
-    </div>
-    <div class="col-lg-1 shopping-list ">
-    </div>
-    <div class="col-lg-4 shopping-list" id="totalPrice">
-    <button type="button" class="btn btn-success">Checkout</button>
-    </div>
-    <hr class = "shopping-list">
-    </div>`);
-}
-function get_total(totalPrice){
-    $('#totalAmount').append(`<div class="row shopping-list">
-    <div class="col-lg-2 shopping-list ">
-    </div>
-    <div class="col-lg-3 shopping-list ">
-    Subtotal
-    </div>
-    <div class="col-lg-2 shopping-list ">
-    </div>
-    <div class="col-lg-2 shopping-list ">
-    </div>
-    <div class="col-lg-3 shopping-list" id="totalPrice">
-    <label id="totalPrice">${totalPrice}
-    </div>
-    <hr class = "shopping-list">
-    </div>`);
 }
 function cartHeaders(){
     $('#cartContainer').append(`<div class="row">
@@ -193,33 +137,87 @@ function cartHeaders(){
     <hr>
     </div>`);   
 }
-
-$().change({
-   
-});
-
-
 $("#selectCurrency").on('change', async function (e) {
+    $("#cartContainer").empty();
+    $("#totalAmount").empty();
     populateCart();
 });
-function getCurrency(){
-    let selectValue = $("#selectCurrency :selected").val(); 
-    let data = fetch("https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/cad.json").
-    then(response => response.json()).
-        then((json) => { 
-            return json["cad"][selectValue];
-        });
-    return data;
-}
-
-class currencyEngine {
+class shopBuilder {
     constructor(){
-        this._currency = 1;
+        this._shoppingCart
     }
-     get currentCurrency(){
-        return this._currency;
+     get renderShoppingCart(){
+        return this._shoppingCart + " The class works";
     }    
-    set currentCurrency(currency){
-        this._currency = currency;
+    set renderShoppingCart(cartItems){
+        this._shoppingCart = cartItems;
+    }
+    buildCart(item, cartList, currency){
+        let sum = cartList[item['id']] * item['price'] * currency;
+        let itemPrice = item['price'] * currency;
+        let cartRow = `<div class="row" id="row${item['id']}">
+        <div class="col-lg-2 shopping-list">
+            <button type="button" class="btn btn-danger" onclick="removeFromCart(${item["id"]})"><span class="material-symbols-outlined">
+            close
+            </span></button>
+        </div>
+        <div class="col-lg-3  shopping-list">
+            ${item['title']}
+        </div>
+        <div class="col-lg-2  shopping-list">
+            ${cartList[item['id']]}
+        </div>
+        <div class="col-lg-2  shopping-list">
+            ${itemPrice.toFixed(2)}
+        </div>
+        <div class="col-lg-3  shopping-list">
+            ${sum.toFixed(2)}
+        </div>
+        <hr class ="shopping-list">
+        </div>`; 
+        return cartRow;
+    }
+    getCurrency(){
+        let selectValue = $("#selectCurrency :selected").val(); 
+        let data = fetch("https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/cad.json").
+        then(response => response.json()).
+            then((json) => { 
+                return json["cad"][selectValue];
+            });
+        return data;
+    }
+    addDivFooter(){
+        $('#totalAmount').append(`<div class="row shopping-list">
+        <div class="col-lg-2 shopping-list ">
+        </div>
+        <div class="col-lg-4 shopping-list ">
+        <button type="button" class="btn btn-warning" onclick="emptyCart()">Empty Cart</button>
+        </div>
+        <div class="col-lg-1 shopping-list ">
+        </div>
+        <div class="col-lg-1 shopping-list ">
+        </div>
+        <div class="col-lg-4 shopping-list" id="totalPrice">
+        <button type="button" class="btn btn-success">Checkout</button>
+        </div>
+        <hr class = "shopping-list">
+        </div>`);
+    }
+    get_total(totalPrice){
+        $('#totalAmount').append(`<div class="row shopping-list">
+        <div class="col-lg-2 shopping-list ">
+        </div>
+        <div class="col-lg-3 shopping-list ">
+        Subtotal
+        </div>
+        <div class="col-lg-2 shopping-list ">
+        </div>
+        <div class="col-lg-2 shopping-list ">
+        </div>
+        <div class="col-lg-3 shopping-list" id="totalPrice">
+        <label id="totalPrice">${totalPrice}
+        </div>
+        <hr class = "shopping-list">
+        </div>`);
     }
 }
