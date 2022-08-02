@@ -4,7 +4,7 @@ $(document).ready(function(){
     closeNav();
     populateCart();
     openNav(); 
-    set_cookie("cartList", {});   
+ //  set_cookie("cartList", {});   
     event_listeners(); 
     renderStates();
    
@@ -150,6 +150,44 @@ function populateCart(currency){
     }
     
 }
+function renderOrderSummary(currency){
+    let renderer = new shopBuilder();
+    $('#summaryBody').empty();
+    let promisedCurrency = renderer.getCurrency();
+    if(currency === undefined){
+        promisedCurrency.then(function(currencyValue) {
+            renderOrderSummary(currencyValue);
+         });
+    }
+    else {        
+        let cartList = get_cookie("cartList");
+        let promiseList = []
+        let rowDom = '';
+        let totalPrice = 0;
+        if(Object.keys(cartList).length > 0 && cartList !== undefined){
+            Object.keys(cartList).forEach(key => {
+                cartItemTest = fetch(`https://fakestoreapi.com/products/${key}`)
+                    .then(res=>res.json())
+                        .then(json=>{
+                            return json});
+                            promiseList.push(cartItemTest);    
+            });               
+            Promise.all(promiseList).then((values) => {
+                renderer.summaryHeader();
+                values.forEach(function(item) {
+                    rowDom += renderer.buildSummary(item, cartList, currency);
+                    totalPrice += item['price'] * cartList[item['id']] * currency;    
+                });
+                $('#summaryBody').append(rowDom);
+                let tax = renderer.getTax();
+                renderer.summaryGrandTotal(totalPrice.toFixed(2), currency, tax);
+            });
+        }
+        else{
+            renderer.renderEmptySummary();
+        }
+    }
+}
 function cartHeaders(){
     $('#cartContainer').append(`<div class="row">
     <div class="col-lg-2 ">
@@ -177,6 +215,50 @@ class shopBuilder{
         this._currency = {"cad": "$", "usd": "US$", "gbp": "£"};
         this._currencySymbol = this._currency[this._selectCurrency];
     }
+    getTax(){
+        let state = $("#state").val();
+        let tax;
+        if(state == "AB"){
+            tax =5;
+        }else if(state == "BC"){
+            tax =12;
+        }else if(state == "MB"){
+            tax =12;
+        }
+        else if(state == "NB"){
+            tax =15;
+        }
+        else if(state == "NL"){
+            tax =15;
+        }
+        else if(state == "NS"){
+            tax =15;
+        }
+        else if(state == "ON"){
+            tax =13;
+        }
+        else if(state == "PE"){
+            tax =15;
+        }
+        else if(state == "QC"){
+            tax =14.975;
+        }
+        else if(state == "SK"){
+            tax =11;
+        }
+        else if(state == "NT"){
+            tax =5;
+        }
+        else if(state == "NU"){
+            tax =5;
+        }
+        else if(state == "YT"){
+            tax =5;
+        }else{
+            tax =10;
+        }
+        return tax;
+    }
     buildCart(item, cartList, currency){
         
         let sum = cartList[item['id']] * item['price'] * currency;
@@ -202,6 +284,26 @@ class shopBuilder{
         <hr class ="shopping-list">
         </div>`; 
         return cartRow;
+    }
+    buildSummary(item, cartList, currency){
+        let sum = cartList[item['id']] * item['price'] * currency;
+        let itemPrice = item['price'] * currency;
+        let cartRow = `<div class="row">
+            <div class="col-lg-5">
+                ${item['title']}
+            </div>
+            <div class="col-lg-1  shopping-list">
+                ${cartList[item['id']]}
+            </div>
+            <div class="col-lg-3  shopping-list">
+                ${this._currencySymbol} ${itemPrice.toFixed(2)}
+            </div>
+            <div class="col-lg-3  shopping-list">
+                ${this._currencySymbol} ${sum.toFixed(2)}
+            </div>
+        </div><hr>`;
+        return cartRow;
+
     }
     renderShopItemEntry(data,price){
         let itemEntry = `<div class="grid-item">
@@ -240,7 +342,7 @@ class shopBuilder{
         <div class="col-lg-1 shopping-list ">
         </div>
         <div class="col-lg-4 shopping-list" id="totalPrice">
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#checkoutModal" id="checkoutButton">
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#checkoutModal" onclick="renderOrderSummary()"id="checkoutButton">
         Checkout
     </button>
         </div>
@@ -259,7 +361,7 @@ class shopBuilder{
         <div class="col-lg-2 shopping-list ">
         </div>
         <div class="col-lg-3 shopping-list" id="totalPrice">
-        <p id="symbol"> ${this._currencySymbol}</p> <p id="totalPrice"> ${totalPrice} </p>
+        <p id="symbol"> ${this._currencySymbol} ${totalPrice} </p>
         </div>
         <hr class = "shopping-list">
         </div>`);
@@ -270,6 +372,93 @@ class shopBuilder{
                   <center> No items in cart </center>
                 </div>
             </div>`);
+    }
+    renderEmptySummary(){
+        $('#summaryBody').empty();
+        $('#summaryBody').append(`<div class="row"> 
+        <div class="col-lg-12 ">
+          <center> No items in added </center>
+        </div>
+    </div>`);
+    }
+    summaryHeader(){
+        $('#summaryBody').append(`<div class="row">
+            <div class="col-lg-5 ">
+            Item    
+            </div>
+            <div class="col-lg-1 ">
+            Qty
+            </div>
+            <div class="col-lg-3 ">
+            Price
+            </div>
+            <div class="col-lg-3 ">
+            Total
+            </div>
+        </div> <hr class="class-1" >`);   
+    }
+    summaryGrandTotal(total, currency, taxRate){
+        let shippingFee = 15 * currency;
+        let tax = total * (taxRate/100);
+        let grandTotal = parseFloat(tax.toFixed(2)) + parseFloat(shippingFee.toFixed(2)) + parseFloat(total);
+        $('#summaryBody').append(`
+        <div class="row summation">
+            <div class="col-lg-5 ">
+            Subtotal 
+            </div>
+            <div class="col-lg-1 ">
+           
+            </div>
+            <div class="col-lg-3 ">
+          
+            </div>
+            <div class="col-lg-3 ">
+            <p id="symbol"> ${this._currencySymbol}  ${total}</p>
+            </div>
+        </div> <hr>
+        <div class="row summation">
+            <div class="col-lg-5 ">
+            Shipping 
+            </div>
+            <div class="col-lg-1 ">
+           
+            </div>
+            <div class="col-lg-3 ">
+          
+            </div>
+            <div class="col-lg-3 ">
+            <p id="symbol"> ${this._currencySymbol}  ${shippingFee.toFixed(2)}</p>
+            </div>
+        </div> <hr>
+        <div class="row summation">
+            <div class="col-lg-5 ">
+            Tax ${taxRate}%
+            </div>
+            <div class="col-lg-1 ">
+           
+            </div>
+            <div class="col-lg-3 ">
+          
+            </div>
+            <div class="col-lg-3 ">
+            
+            <p id="symbol"> ${this._currencySymbol}  ${tax.toFixed(2)}</p>
+            </div>
+        </div> <hr>
+        <div class="row summation">
+            <div class="col-lg-5 ">
+            Order Total 
+            </div>
+            <div class="col-lg-1 ">
+           
+            </div>
+            <div class="col-lg-3 ">
+          
+            </div>
+            <div class="col-lg-3 ">
+            <p id="symbol"> ${this._currencySymbol}  ${grandTotal}</p>
+            </div>
+        </div> <hr>`);   
     }
 
 
@@ -292,6 +481,9 @@ function event_listeners(){
         }
         
     });
+    $("#checkoutButton").click(function() {
+        renderOrderSummary();
+    });
     $("#selectCurrency").on('change', function (e) {
         $("#cartContainer").empty();
         $("#totalAmount").empty();
@@ -309,7 +501,6 @@ function event_listeners(){
     $("#confirmOrder").click(function() {
 
         let currentNav = $("#currentNav").val();
-        console.log(currentNav);
         if(currentNav == 1) {
             validatePaymentTab();
         }
@@ -384,8 +575,6 @@ function event_listeners(){
         if(result !== undefined){
             checkOutForm.validationReport(elemID, result);
         }
-       
-        console.log(checkOutForm.checkSumValidity());
     });
 
     function validatePaymentTab(){
@@ -444,7 +633,6 @@ function event_listeners(){
                     count++;
                 }
             }
-            console.log(count);
             if(count == 5){
                 $("#pMethod3").remove("");
                 $("#nav3").append("<label id='pMethod3'>✅</label>");

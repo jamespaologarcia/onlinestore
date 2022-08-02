@@ -108,3 +108,9 @@ body { font-family: sans-serif; }
   button.valid-nav{
 	background-color: #4CAF50;
   }
+  hr.class-1 {
+	border-top: 10px solid #000000;
+}
+.summation{
+	font-weight: bold;
+}

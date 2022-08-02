@@ -16,9 +16,9 @@
 	</head>
 	<body>
 		<div id="main">
-			<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#checkoutModal" id="checkoutButton">
+		<!--	<button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#checkoutModal" id="checkoutButton">
 				Checkout
-			</button>
+			</button> -->
 		  
 		
 
@@ -166,7 +166,7 @@
 										<div class="col">
 											<div class="form-outline">
 												<label class="form-label" for="city">City</label>
-												<input type="text" id="city" class="form-control   checkout-fields" />
+												<input type="text" id="city" class="form-control checkout-fields" />
 												<div class="invalid-feedback">Please enter a city</div>
 												<div class="valid-feedback">Looks good!</div>
 											</div>
@@ -298,7 +298,14 @@
 							</div>
 						</div>
 						<div class="tab-pane fade" id="tabs-4" role="tabpanel" aria-labelledby="tabs-4">
-							Tab4
+							<div id="orderSummary">
+								<div class="card-header py-3">
+									<h5 class="mb-0">Order Summary</h5>
+								</div>
+								<div class="card-body" id="summaryBody">
+
+								</div>
+							</div>
 						</div>
 					</div>
 				
