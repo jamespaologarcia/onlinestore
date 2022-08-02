@@ -95,3 +95,16 @@ body { font-family: sans-serif; }
 	'GRAD' 0,
 	'opsz' 20
   }
+
+  .valid-feedback.feedback-icon,
+  .invalid-feedback.feedback-icon {
+	  position: absolute;
+	  width: auto;
+	  bottom: 10px;
+	  right: 10px;
+	  margin-top: 0;
+  }
+
+  button.valid-nav{
+	background-color: #4CAF50;
+  }

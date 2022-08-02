@@ -4,9 +4,39 @@ $(document).ready(function(){
     closeNav();
     populateCart();
     openNav(); 
-    set_cookie("cartList", {});
-    
+    set_cookie("cartList", {});   
+    event_listeners(); 
+    renderStates();
+   
 });
+function renderStates(){
+    let country1 = $("#country :selected").val(); 
+    let country2 = $("#s_country :selected").val(); 
+    let provStates = {};
+
+    
+    if(country1 == "canada"){
+        provStates = canadianProvinces();
+    }
+    else if(country1 == "usa"){
+        provStates = usStates();
+    }
+    if(country2 == "canada"){
+        provStates2 = canadianProvinces();
+    }
+    else if(country2 == "usa"){
+        provStates2 = usStates();
+    }
+    $("#state").append($("<option />").val("").text(""));
+    $("#s_state").append($("<option />").val("").text(""));
+    Object.keys(provStates).forEach(key => {
+        $("#state").append($("<option />").val(key).text(provStates[key]));
+    });   
+    Object.keys(provStates2).forEach(key => {
+        $("#s_state").append($("<option />").val(key).text(provStates2[key]));
+    });   
+
+}
 $('.grid').masonry({
     // options
     itemSelector: '.grid-item',
@@ -28,6 +58,7 @@ function closeNav() {
 function addToCart(id){
     $("#cartContainer").empty();
     $("#totalAmount").empty();
+    id = id.toString();
     $("#"+id).prop('disabled', true);
     let list = get_cookie("cartList");
     if (list === null) {
@@ -77,13 +108,12 @@ function emptyCart(){
     set_cookie("cartList", {});
     populateCart();
 }
-
 function populateCart(currency){
     let renderer = new shopBuilder();
     let promisedCurrency = renderer.getCurrency();
     if(currency === undefined){
-        promisedCurrency.then(function(xa) {
-            populateCart(xa);
+        promisedCurrency.then(function(currencyValue) {
+            populateCart(currencyValue);
          });
     }
     else {        
@@ -111,7 +141,8 @@ function populateCart(currency){
                 renderer.get_total(totalPrice.toFixed(2));
                 renderer.addDivFooter();
                 $(".add-to-cart-button").prop('disabled', false);
-            });        
+                return totalPrice;
+            });
         }
         else{
             renderer.renderEmptyCart();
@@ -138,12 +169,8 @@ function cartHeaders(){
     <hr>
     </div>`);   
 }
-$("#selectCurrency").on('change', function (e) {
-    $("#cartContainer").empty();
-    $("#totalAmount").empty();
-    populateCart();
-    loadData();
-});
+
+
 class shopBuilder{
     constructor(){
         this._selectCurrency = $("#selectCurrency :selected").val(); 
@@ -177,7 +204,6 @@ class shopBuilder{
         return cartRow;
     }
     renderShopItemEntry(data,price){
-        console.log(this._currencySymbol);
         let itemEntry = `<div class="grid-item">
             <div class="card">
             <img src="${data.image}" height="auto" width="200px"></img>
@@ -214,7 +240,9 @@ class shopBuilder{
         <div class="col-lg-1 shopping-list ">
         </div>
         <div class="col-lg-4 shopping-list" id="totalPrice">
-        <button type="button" class="btn btn-success">Checkout</button>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#checkoutModal" id="checkoutButton">
+        Checkout
+    </button>
         </div>
         <hr class = "shopping-list">
         </div>`);
@@ -231,7 +259,7 @@ class shopBuilder{
         <div class="col-lg-2 shopping-list ">
         </div>
         <div class="col-lg-3 shopping-list" id="totalPrice">
-        <label id="totalPrice"> ${this._currencySymbol} ${totalPrice}
+        <p id="symbol"> ${this._currencySymbol}</p> <p id="totalPrice"> ${totalPrice} </p>
         </div>
         <hr class = "shopping-list">
         </div>`);
@@ -243,4 +271,309 @@ class shopBuilder{
                 </div>
             </div>`);
     }
+
+
+}
+
+
+
+//listeners
+function event_listeners(){
+    $("#shipping").hide();
+    let checkOutForm = new formValidation();
+    $('#sameShipping').click(function() {
+        $("#shipping").toggle(this.notchecked);
+        if(document.getElementById('sameShipping').checked && validateBillingTab() == 1) {
+            $("#pMethod3").remove("");
+            $("#nav3").append("<label id='pMethod3'>✅</label>");
+        }
+        else if(!document.getElementById('sameShipping').checked){
+            validateShippingTab();
+        }
+        
+    });
+    $("#selectCurrency").on('change', function (e) {
+        $("#cartContainer").empty();
+        $("#totalAmount").empty();
+        populateCart();
+        loadData();
+    });
+    $("#country").on('change', function (e) {
+        $("#state").empty();
+        renderStates();
+    });
+    $("#s_country").on('change', function (e) {
+        $("#s_state").empty();
+        renderStates();
+    });
+    $("#confirmOrder").click(function() {
+
+        let currentNav = $("#currentNav").val();
+        console.log(currentNav);
+        if(currentNav == 1) {
+            validatePaymentTab();
+        }
+        else if(currentNav == 2){
+            validateBillingTab();
+        }
+        else if(currentNav == 3){
+            validateShippingTab();
+        }
+        if(currentNav < 4){
+            currentNav = parseInt(currentNav) + 1;
+        }
+        $("#currentNav").val(currentNav);
+        if(currentNav == 4){
+            $("#confirmOrder").html("Complete Order Now");
+        }
+        var sel = document.querySelector(`#nav${currentNav}`);
+      
+        bootstrap.Tab.getOrCreateInstance(sel).show(); 
+        
+      });
+      $(".nav-link").click(function() {
+        let currentNav = $(this).val();
+        $("#currentNav").val(currentNav);
+        if(currentNav == 4){
+            $("#confirmOrder").html("Complete Order Now");
+        }
+        else{
+            $("#confirmOrder").html("Continue");
+        }        
+      });
+     $('.checkout-fields').on('blur',function (event) {
+        let elemID = event.target.id;
+        let result;
+        if(elemID == "formCardNumber"){
+            result = checkOutForm.validateCard($(`#${elemID}`).val());
+        }
+        else if(elemID == "expiryMonth"){
+            result = checkOutForm.validateMonth($(`#${elemID}`).val());
+        }
+        else if(elemID == "expiryYear"){
+            result = checkOutForm.validateYear($(`#${elemID}`).val());
+        }
+        else if(elemID == "formCVV"){
+            result = checkOutForm.validateCVV($(`#${elemID}`).val());
+        }
+        else if(elemID == "firstName" || 
+            elemID == "lastName" ||
+            elemID == "s_firstName" ||
+            elemID == "s_lastName"){
+            result = checkOutForm.validateName($(`#${elemID}`).val());
+        }
+        else if(elemID == "email"){
+            result = checkOutForm.validateEmail($(`#${elemID}`).val());
+        }
+        else if(elemID == "phone"){
+            result = checkOutForm.validatePhone($(`#${elemID}`).val());
+        }
+        else if(elemID == "address" || elemID == "s_address" || elemID == "city" || elemID == "s_city"){
+            result = checkOutForm.validateBlank($(`#${elemID}`).val());
+        }
+        else if(elemID == "state" || elemID == "s_state"){
+             
+            result = checkOutForm.validateBlank($(`#${elemID} :selected`).val());
+        }
+        else if(elemID == "s_zip" || elemID == "zip"){
+            result = checkOutForm.validateZip(     
+                $(`#${elemID}`).val(),
+                $("#country :selected").val()
+            );
+        }
+        if(result !== undefined){
+            checkOutForm.validationReport(elemID, result);
+        }
+       
+        console.log(checkOutForm.checkSumValidity());
+    });
+
+    function validatePaymentTab(){
+        let IDs = [];
+        $("#paymentInfo").find("input").each(function(){ IDs.push(this.id); });
+        let count = 0;
+        let sumValidity = checkOutForm.checkSumValidity();
+        for(let i=0; i<IDs.length; i++){
+            if(sumValidity[IDs[i]]==1){
+                count++;
+            }
+        }
+        if(count == IDs.length){
+            $("#pMethod1").remove("");
+            $("#nav1").append("<label id='pMethod1'>✅</label>");
+        }
+        else{
+            $("#pMethod1").remove("");
+            $("#nav1").append("<label id='pMethod1'>❌</label>");
+        }
+    }
+    function validateBillingTab(){
+        let IDs = [];
+        $("#billingInfo").find("input").each(function(){ IDs.push(this.id); });
+        let count = 0;
+        let sumValidity = checkOutForm.checkSumValidity();
+        for(let i=0; i<IDs.length; i++){
+            if(sumValidity[IDs[i]]==1){
+                count++;
+            }
+        }
+        result = 0;
+        if(count == 7){
+            $("#pMethod2").remove("");
+            $("#nav2").append("<label id='pMethod2'>✅</label>");
+            result = 1;
+        }
+        else{
+            $("#pMethod2").remove("");
+            $("#nav2").append("<label id='pMethod2'>❌</label>");
+        }
+        return result;
+    }
+    function validateShippingTab(){
+        if(document.getElementById('sameShipping').checked && validateBillingTab() == 1) {
+            $("#pMethod3").remove("");
+            $("#nav3").append("<label id='pMethod3'>✅</label>");
+        }
+        else if(!document.getElementById('sameShipping').checked){
+            let IDs = [];
+            $("#shippingInfo").find("input").each(function(){ IDs.push(this.id); });
+            let count = 0;
+            let sumValidity = checkOutForm.checkSumValidity();
+            for(let i=0; i<IDs.length; i++){
+                if(sumValidity[IDs[i]]==1){
+                    count++;
+                }
+            }
+            console.log(count);
+            if(count == 5){
+                $("#pMethod3").remove("");
+                $("#nav3").append("<label id='pMethod3'>✅</label>");
+                result = 1;
+            }
+            else{
+                $("#pMethod3").remove("");
+                $("#nav3").append("<label id='pMethod3'>❌</label>");
+            }
+        }
+    }
+    function validateAllTabs(){
+
+    }
+}
+class formValidation{
+    constructor(){
+        this._validity = {};
+    }
+    validateCard(data){
+        if(!/^3[47][0-9]{13}$/.test(data) && 
+        !/^4[0-9]{12}(?:[0-9]{3})?$/.test(data) && 
+        !/^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14})$/.test(data) && 
+        !/^(5[1-5][0-9]{14}|2(22[1-9][0-9]{12}|2[3-9][0-9]{13}|[3-6][0-9]{14}|7[0-1][0-9]{13}|720[0-9]{12}))$/.test(data)){
+            return 0;
+        }
+        else{
+            return 1;
+        }
+    }
+    validateMonth(data){
+        if(!/^(0?[1-9]|1[012])$/.test(data)){
+            return 0
+        }
+        else{
+            return 1;
+        }
+    }
+    validateYear(data){
+        if(!/\b(20[2-4][0-9]|50)\b/.test(data)){
+            return 0
+        }
+        else{
+            return 1;
+        }
+    }
+    validateCVV(data){
+        if(!/[0-9]\d\d/g.test(data)){
+            return 0
+        }
+        else{
+            return 1;
+        }
+    }
+    validateName(data){
+        if(!/^[a-zA-Z ]{2,30}$/.test(data)){
+            return 0;
+        }
+        else{
+            return 1;
+        }
+    }
+    validateEmail(data){
+        if(!/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(data)){
+            return 0;
+        }else{
+            return 1;
+        }
+    }
+    validatePhone(data){
+        if(!/^\(?([0-9]{3})\)?[- ]?([0-9]{3})[- ]?([0-9]{4})$/.test(data)){
+            return 0;
+        }else{ 
+            return 1;
+        }
+    }
+    validateBlank(data){
+        if(data == "" || data === undefined){
+            return 0;
+        }else{
+            return 1;
+        }
+    }
+    validateZip(data, country){
+        let result = 1;
+        if(country == "canada"){
+            if(!/^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ -]?\d[ABCEGHJ-NPRSTV-Z]\d$/i.test(data)){
+                result = 0;
+            }
+        }else if(country == "usa"){
+            if(!/^[0-9]{5}(?:-[0-9]{4})?$/.test(data)){
+                result = 0;
+            }
+        }
+       return result;
+    }
+    validationReport(elemID, result){
+        if(result == 1){
+            $(`#${elemID}`).addClass("is-valid");
+            $(`#${elemID}`).removeClass("is-invalid");
+            this._validity[elemID] = 1;
+        }else{
+            $(`#${elemID}`).addClass("is-invalid");
+            $(`#${elemID}`).removeClass("is-valid");
+            this._validity[elemID] = 0;
+        }
+    }
+    checkSumValidity(){
+        return this._validity;
+    }
+   
+}
+function usStates(){
+    states = {"AL":"Alabama","AK":"Alaska","AZ":"Arizona","AR":"Arkansas","CA":"California","CO":"Colorado","CT":"Connecticut","DE":"Delaware","FL":"Florida","GA":"Georgia","HI":"Hawaii","ID":"Idaho","IL":"Illinois","IN":"Indiana","IA":"Iowa","KS":"Kansas","KY":"Kentucky","LA":"Louisiana","ME":"Maine","MD":"Maryland","MA":"Massachusetts","MI":"Michigan","MN":"Minnesota","MS":"Mississippi","MO":"Missouri","MT":"Montana","NE":"Nebraska","NV":"Nevada","NH":"New Hampshire","NJ":"New Jersey","NM":"New Mexico","NY":"New York","NC":"North Carolina","ND":"North Dakota","OH":"Ohio","OK":"Oklahoma","OR":"Oregon","PA":"Pennsylvania","RI":"Rhode Island","SC":"South Carolina","SD":"South Dakota","TN":"Tennessee","TX":"Texas","UT":"Utah","VT":"Vermont","VA":"Virginia","WA":"Washington","WV":"West Virginia","WI":"Wisconsin","WY":"Wyoming"};
+    return states;
+}
+function canadianProvinces(){
+    provinces = {'AB' : 'Alberta',
+    'BC' : 'British Columbia',
+    'MB' : 'Manitoba',
+    'NB' : 'New Brunswick',
+    'NL' : 'Newfoundland and Labrador',
+    'NS' : 'Nova Scotia',
+    'ON' : 'Ontario',
+    'PE' : 'Prince Edward Island',
+    'QC' : 'Quebec',
+    'SK' : 'Saskatchewan',
+    'NT' : 'Northwest Territories',
+    'NU' : 'Nunavut',
+    'YT' : 'Yukon'};
+    return provinces;
 }
