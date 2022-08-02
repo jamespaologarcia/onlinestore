@@ -632,6 +632,7 @@ function event_listeners(){
                 count++;
             }
         }
+        //test
         result = 0;
         if(count == 7){
             $("#pMethod2").remove("");
