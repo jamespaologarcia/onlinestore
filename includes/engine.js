@@ -153,6 +153,9 @@ function populateCart(currency){
 function renderOrderSummary(currency){
     let renderer = new shopBuilder();
     $('#summaryBody').empty();
+    $("#confirmOrder").prop('disabled', false);
+    var sel = document.querySelector(`#nav1`);
+    bootstrap.Tab.getOrCreateInstance(sel).show(); 
     let promisedCurrency = renderer.getCurrency();
     if(currency === undefined){
         promisedCurrency.then(function(currencyValue) {
@@ -481,8 +484,9 @@ function event_listeners(){
         }
         
     });
-    $("#checkoutButton").click(function() {
-        renderOrderSummary();
+    $('#checkoutModal').on('hidden.bs.modal', function () {
+        $("#currentNav").val("1");
+        console.log($("#currentNav").val());
     });
     $("#selectCurrency").on('change', function (e) {
         $("#cartContainer").empty();
@@ -499,39 +503,49 @@ function event_listeners(){
         renderStates();
     });
     $("#confirmOrder").click(function() {
-
         let currentNav = $("#currentNav").val();
         if(currentNav == 1) {
+            $(`#nav1`).prop('aria-selected', true);
+            $(`#nav2`).prop('aria-selected', false);
+            $(`#nav3`).prop('aria-selected', false);
+            $(`#nav4`).prop('aria-selected', false);
             validatePaymentTab();
         }
         else if(currentNav == 2){
+            $(`#nav1`).prop('aria-selected', false);
+            $(`#nav2`).prop('aria-selected', true);
+            $(`#nav3`).prop('aria-selected', false);
+            $(`#nav4`).prop('aria-selected', false);
             validateBillingTab();
         }
         else if(currentNav == 3){
+            $(`#nav1`).prop('aria-selected', false);
+            $(`#nav2`).prop('aria-selected', false);
+            $(`#nav3`).prop('aria-selected', true);
+            $(`#nav4`).prop('aria-selected', false);
             validateShippingTab();
         }
+        else if(currentNav == 4){
+            $(`#nav1`).prop('aria-selected', false);
+            $(`#nav2`).prop('aria-selected', false);
+            $(`#nav3`).prop('aria-selected', false);
+            $(`#nav4`).prop('aria-selected', true);
+        }
         if(currentNav < 4){
+            
             currentNav = parseInt(currentNav) + 1;
         }
         $("#currentNav").val(currentNav);
         if(currentNav == 4){
+          
+            $("#confirmOrder").prop('disabled', true);
+            validateAllTabs();
             $("#confirmOrder").html("Complete Order Now");
         }
+        console.log(currentNav);
         var sel = document.querySelector(`#nav${currentNav}`);
-      
         bootstrap.Tab.getOrCreateInstance(sel).show(); 
-        
-      });
-      $(".nav-link").click(function() {
-        let currentNav = $(this).val();
-        $("#currentNav").val(currentNav);
-        if(currentNav == 4){
-            $("#confirmOrder").html("Complete Order Now");
-        }
-        else{
-            $("#confirmOrder").html("Continue");
-        }        
-      });
+    });
      $('.checkout-fields').on('blur',function (event) {
         let elemID = event.target.id;
         let result;
@@ -548,9 +562,11 @@ function event_listeners(){
             result = checkOutForm.validateCVV($(`#${elemID}`).val());
         }
         else if(elemID == "firstName" || 
-            elemID == "lastName" ||
-            elemID == "s_firstName" ||
-            elemID == "s_lastName"){
+            elemID == "lastName"){
+            result = checkOutForm.validateName($(`#${elemID}`).val());
+        }
+        else if(elemID == "s_firstName" ||
+        elemID == "s_lastName"){
             result = checkOutForm.validateName($(`#${elemID}`).val());
         }
         else if(elemID == "email"){
@@ -559,18 +575,25 @@ function event_listeners(){
         else if(elemID == "phone"){
             result = checkOutForm.validatePhone($(`#${elemID}`).val());
         }
-        else if(elemID == "address" || elemID == "s_address" || elemID == "city" || elemID == "s_city"){
+        else if(elemID == "address" || elemID == "city" || elemID == "state" ){
             result = checkOutForm.validateBlank($(`#${elemID}`).val());
         }
-        else if(elemID == "state" || elemID == "s_state"){
-             
-            result = checkOutForm.validateBlank($(`#${elemID} :selected`).val());
+        else if(elemID == "s_address"|| elemID == "s_city" || elemID == "s_state"  ){
+            result = checkOutForm.validateBlank($(`#${elemID}`).val());
         }
-        else if(elemID == "s_zip" || elemID == "zip"){
+        else if(elemID == "s_zip"){
             result = checkOutForm.validateZip(     
                 $(`#${elemID}`).val(),
                 $("#country :selected").val()
             );
+        }
+        else if(elemID == "zip"){
+            result = checkOutForm.validateZip(     
+                $(`#${elemID}`).val(),
+                $("#country :selected").val()
+            );
+            
+            validateBillingTab();
         }
         if(result !== undefined){
             checkOutForm.validationReport(elemID, result);
@@ -582,6 +605,7 @@ function event_listeners(){
         $("#paymentInfo").find("input").each(function(){ IDs.push(this.id); });
         let count = 0;
         let sumValidity = checkOutForm.checkSumValidity();
+        let result = 0;
         for(let i=0; i<IDs.length; i++){
             if(sumValidity[IDs[i]]==1){
                 count++;
@@ -590,11 +614,13 @@ function event_listeners(){
         if(count == IDs.length){
             $("#pMethod1").remove("");
             $("#nav1").append("<label id='pMethod1'>✅</label>");
+            result = 1
         }
         else{
             $("#pMethod1").remove("");
             $("#nav1").append("<label id='pMethod1'>❌</label>");
         }
+        return result;
     }
     function validateBillingTab(){
         let IDs = [];
@@ -619,9 +645,15 @@ function event_listeners(){
         return result;
     }
     function validateShippingTab(){
+        let result = 0;
         if(document.getElementById('sameShipping').checked && validateBillingTab() == 1) {
             $("#pMethod3").remove("");
             $("#nav3").append("<label id='pMethod3'>✅</label>");
+            result = 1;
+        }
+        else if(document.getElementById('sameShipping').checked && validateBillingTab() == 0){
+            $("#pMethod3").remove("");
+            $("#nav3").append("<label id='pMethod3'>❌</label>");
         }
         else if(!document.getElementById('sameShipping').checked){
             let IDs = [];
@@ -643,8 +675,19 @@ function event_listeners(){
                 $("#nav3").append("<label id='pMethod3'>❌</label>");
             }
         }
+        return result;
     }
     function validateAllTabs(){
+        let result = 0;
+        if(validateShippingTab() == 1 && validateBillingTab() == 1 && validatePaymentTab() == 1){
+            result = 1;
+            $("#confirmOrder").prop('disabled', false);
+        }
+        else{
+            $("#confirmOrder").prop('disabled', true);
+        }
+        console.log(result);
+        return result;
 
     }
 }
