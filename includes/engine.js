@@ -310,6 +310,7 @@ function event_listeners(){
   
     });
     $("#selectCurrency").on('change', function (e) {
+        renderer.currencySymbol =  $("#selectCurrency :selected").val();
         populateCart();
         loadData();
     });

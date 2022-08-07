@@ -5,6 +5,12 @@ class shopBuilder{
         this._currencySymbol = this._currency[this._selectCurrency];
         this._products;
     }
+    set currencySymbol(symbol){
+        this._currencySymbol = this._currency[symbol];
+    }
+    get currencySymbol(){
+        return this._currencySymbol;
+    }
     set productList(URL){
         this._products = fetch(URL)
         .then(res=>res.json())
