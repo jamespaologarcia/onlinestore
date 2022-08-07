@@ -1,30 +1,38 @@
-
+const renderer = new shopBuilder();
+const checkOutForm = new formValidation();
 $(document).ready(function(){
     loadData();
     closeNav();
     populateCart();
-    openNav(); 
- //  set_cookie("cartList", {});   
+    
     event_listeners(); 
     renderStates();
-   
+
+
+
 });
+
+
+renderer.productList = "https://fakestoreapi.com/products/";
 function renderStates(){
+    //Changes the states on the select list based on the selected country
     let country1 = $("#country :selected").val(); 
     let country2 = $("#s_country :selected").val(); 
     let provStates = {};
-
-    
-    if(country1 == "canada"){
+    if(country1 == "CA"){
+        //loads canadian provinces for billing
         provStates = canadianProvinces();
     }
-    else if(country1 == "usa"){
+    else if(country1 == "US"){
+        //loads US States for billing
         provStates = usStates();
     }
-    if(country2 == "canada"){
+    if(country2 == "CA"){
+        //loads US States for shipping
         provStates2 = canadianProvinces();
     }
-    else if(country2 == "usa"){
+    else if(country2 == "US"){
+          //loads US States for shipping
         provStates2 = usStates();
     }
     $("#state").append($("<option />").val("").text(""));
@@ -38,7 +46,6 @@ function renderStates(){
 
 }
 $('.grid').masonry({
-    // options
     itemSelector: '.grid-item',
     columnWidth: 200
 });
@@ -46,8 +53,8 @@ function loadData(){
     $("#demo").empty();
     let apiURL = "https://fakestoreapi.com/products";
     let storeProducts = populateStore(apiURL);
-    $(".grid").empty();
-    $('.grid').append(storeProducts);
+    $('#grid').append(storeProducts);
+ 
 }
 function openNav() {
     $("#mySidenav").show();
@@ -56,9 +63,9 @@ function closeNav() {
    $("#mySidenav").hide();
 }
 function addToCart(id){
-    $("#cartContainer").empty();
-    $("#totalAmount").empty();
+    //adds items to the cart
     id = id.toString();
+    //disables the button upon clicking to prevent click spamming which can mess up the UI of the cart
     $("#"+id).prop('disabled', true);
     let list = get_cookie("cartList");
     if (list === null) {
@@ -68,37 +75,53 @@ function addToCart(id){
         list[id] = 1;
     }
     else{
-    list[id]++;
+        list[id]++;
     }
+    itemID = list[id];
+    //updates item amounts in cart to the button on the store list. 
+    $(`.add-to-cart-button#${id}`).html(` ➕ Add to Cart [${itemID}]`);
     set_cookie("cartList", list);
+    //calls the function to re-render the cart to update the cart items
     populateCart();
 }
 function removeFromCart(id){
-    $("#cartContainer").empty();
-    $("#totalAmount").empty();
     let list = get_cookie("cartList");
     delete list[id];
     set_cookie("cartList", list);
+    itemID = list[id];
+    itemID = `[${itemID}]`;
+    if(itemID === undefined){
+        itemID = "";
+    }
+    //updates item amounts in cart to the button on the store list.     
+    $(`.add-to-cart-button#${id}`).html(` ➕ Add to Cart`);
+    set_cookie("cartList", list);
+      //calls the function to re-render the cart to update the cart items
     populateCart();
 }
 function populateStore(apiURL, currency){
+    $("#grid").empty();
     let storeProducts = "";
-    let renderer = new shopBuilder();
     let promisedCurrency = renderer.getCurrency();
+    let cartList = get_cookie("cartList");
+    //recursion to supply the currency argument
     if(currency === undefined){
         promisedCurrency.then(function(xa) {
             populateStore(apiURL, xa)
          });
     }
     else {
-        fetch(apiURL).
-        then(response => response.json()).
+        renderer.productList.
             then((json) => {
                 json.forEach((data) => {
                     let price = data.price * currency;
-                    let itemEntry = renderer.renderShopItemEntry(data,price);
-                    $(".grid").append(itemEntry);
+                    //renders the shop item entry with the price calculated with the selected currency and the cartList
+                    //cartList is needed to render the buttons to match the current items in cart even when reloaded.
+                    let itemEntry = renderer.renderShopItemEntry(data, price, cartList);
+                    $(".grid-container").append(itemEntry);
                 });
+            }).catch((error) => {
+                $(".grid-container").append(error);
             }); 
         return storeProducts;
     }
@@ -109,8 +132,10 @@ function emptyCart(){
     populateCart();
 }
 function populateCart(currency){
-    let renderer = new shopBuilder();
+    $("#cartContainer").empty();
+    $("#totalAmount").empty();
     let promisedCurrency = renderer.getCurrency();
+        //recursion to supply the currency argument
     if(currency === undefined){
         promisedCurrency.then(function(currencyValue) {
             populateCart(currencyValue);
@@ -118,45 +143,44 @@ function populateCart(currency){
     }
     else {        
         let cartList = get_cookie("cartList");
-        let promiseList = []
-        let rowDom = '';
+        let rowDom = ''; //DOM BUILDER
         let totalPrice = 0;
         cartHeaders();
-        if(Object.keys(cartList).length > 0 && cartList !== undefined){
-            let count = 0;
-            Object.keys(cartList).forEach(key => {
-                cartItemTest = fetch(`https://fakestoreapi.com/products/${key}`)
-                    .then(res=>res.json())
-                        .then(json=>{
-                            return json});
-                            promiseList.push(cartItemTest);    
-            });               
-            Promise.all(promiseList).then((values) => {
-                count++;
-                values.forEach(function(item) {
-                    rowDom += renderer.buildCart(item, cartList, currency);
-                    totalPrice += item['price'] * cartList[item['id']] * currency;    
+        if(Object.keys(cartList).length > 0 && cartList !== undefined){            
+            renderer.productList.
+            then((json) => {
+                json.forEach((data) => {
+                   if(cartList[data['id']] !== undefined){
+                         rowDom += renderer.buildCart(data, cartList, currency);
+                          totalPrice += data['price'] * cartList[data['id']] * currency;   
+                    } 
                 });
                 $('#cartContainer').append(rowDom);
-                renderer.get_total(totalPrice.toFixed(2));
-                renderer.addDivFooter();
-                $(".add-to-cart-button").prop('disabled', false);
-                return totalPrice;
-            });
+                 //renders the subtotal
+                 renderer.get_total(totalPrice.toFixed(2));
+                 renderer.addDivFooter();
+                 //re-enables the add to cart button once the shopping cart is done rendering
+                 $(".add-to-cart-button").prop('disabled', false);
+
+            }).catch((error) => {
+                $(".grid-container").append(error);
+            }); 
         }
         else{
+            //default display when the cart is empty
             renderer.renderEmptyCart();
         }
     }
-    
 }
+
+
 function renderOrderSummary(currency){
-    let renderer = new shopBuilder();
     $('#summaryBody').empty();
     $("#confirmOrder").prop('disabled', false);
     var sel = document.querySelector(`#nav1`);
     bootstrap.Tab.getOrCreateInstance(sel).show(); 
     let promisedCurrency = renderer.getCurrency();
+    //recursion to supply the currency argument
     if(currency === undefined){
         promisedCurrency.then(function(currencyValue) {
             renderOrderSummary(currencyValue);
@@ -164,333 +188,128 @@ function renderOrderSummary(currency){
     }
     else {        
         let cartList = get_cookie("cartList");
-        let promiseList = []
         let rowDom = '';
         let totalPrice = 0;
-        if(Object.keys(cartList).length > 0 && cartList !== undefined){
-            Object.keys(cartList).forEach(key => {
-                cartItemTest = fetch(`https://fakestoreapi.com/products/${key}`)
-                    .then(res=>res.json())
-                        .then(json=>{
-                            return json});
-                            promiseList.push(cartItemTest);    
-            });               
-            Promise.all(promiseList).then((values) => {
-                renderer.summaryHeader();
-                values.forEach(function(item) {
-                    rowDom += renderer.buildSummary(item, cartList, currency);
-                    totalPrice += item['price'] * cartList[item['id']] * currency;    
-                });
-                $('#summaryBody').append(rowDom);
-                let tax = renderer.getTax();
-                renderer.summaryGrandTotal(totalPrice.toFixed(2), currency, tax);
+
+        renderer.productList.
+        then((json) => {
+            json.forEach((data) => {
+               if(cartList[data['id']] !== undefined){
+                    rowDom += renderer.buildSummary(data, cartList, currency);
+                    totalPrice += data['price'] * cartList[data['id']] * currency;   
+                } 
             });
-        }
-        else{
-            renderer.renderEmptySummary();
-        }
+            $('#summaryBody').append(rowDom);
+            let tax = renderer.getTax();
+            renderer.summaryGrandTotal(totalPrice.toFixed(2), currency, tax);
+
+        }).catch((error) => {
+            $(".grid-container").append(error);
+        });
     }
 }
 function cartHeaders(){
-    $('#cartContainer').append(`<div class="row">
+    $('#cartContainer').append(`<div class="row cart-header">
     <div class="col-lg-2 ">
     </div>
     <div class="col-lg-3 ">
-    Item    
+        Item    
     </div>
     <div class="col-lg-1 ">
-    Qty
+        Qty
     </div>
     <div class="col-lg-3 ">
-    Price
+        Price
     </div>
     <div class="col-lg-3 ">
-    Total
+        Total
     </div>
     <hr>
     </div>`);   
 }
 
-
-class shopBuilder{
-    constructor(){
-        this._selectCurrency = $("#selectCurrency :selected").val(); 
-        this._currency = {"cad": "$", "usd": "US$", "gbp": "£"};
-        this._currencySymbol = this._currency[this._selectCurrency];
-    }
-    getTax(){
-        let state = $("#state").val();
-        let tax;
-        if(state == "AB"){
-            tax =5;
-        }else if(state == "BC"){
-            tax =12;
-        }else if(state == "MB"){
-            tax =12;
-        }
-        else if(state == "NB"){
-            tax =15;
-        }
-        else if(state == "NL"){
-            tax =15;
-        }
-        else if(state == "NS"){
-            tax =15;
-        }
-        else if(state == "ON"){
-            tax =13;
-        }
-        else if(state == "PE"){
-            tax =15;
-        }
-        else if(state == "QC"){
-            tax =14.975;
-        }
-        else if(state == "SK"){
-            tax =11;
-        }
-        else if(state == "NT"){
-            tax =5;
-        }
-        else if(state == "NU"){
-            tax =5;
-        }
-        else if(state == "YT"){
-            tax =5;
-        }else{
-            tax =10;
-        }
-        return tax;
-    }
-    buildCart(item, cartList, currency){
-        
-        let sum = cartList[item['id']] * item['price'] * currency;
-        let itemPrice = item['price'] * currency;
-        let cartRow = `<div class="row" id="row${item['id']}">
-        <div class="col-lg-2 shopping-list">
-            <button type="button" class="btn btn-danger" onclick="removeFromCart(${item["id"]})"><span class="material-symbols-outlined">
-            close
-            </span></button>
-        </div>
-        <div class="col-lg-3  shopping-list">
-            ${item['title']}
-        </div>
-        <div class="col-lg-1  shopping-list">
-            ${cartList[item['id']]}
-        </div>
-        <div class="col-lg-3  shopping-list">
-        ${this._currencySymbol} ${itemPrice.toFixed(2)}
-        </div>
-        <div class="col-lg-3  shopping-list">
-           ${this._currencySymbol} ${sum.toFixed(2)}
-        </div>
-        <hr class ="shopping-list">
-        </div>`; 
-        return cartRow;
-    }
-    buildSummary(item, cartList, currency){
-        let sum = cartList[item['id']] * item['price'] * currency;
-        let itemPrice = item['price'] * currency;
-        let cartRow = `<div class="row">
-            <div class="col-lg-5">
-                ${item['title']}
-            </div>
-            <div class="col-lg-1  shopping-list">
-                ${cartList[item['id']]}
-            </div>
-            <div class="col-lg-3  shopping-list">
-                ${this._currencySymbol} ${itemPrice.toFixed(2)}
-            </div>
-            <div class="col-lg-3  shopping-list">
-                ${this._currencySymbol} ${sum.toFixed(2)}
-            </div>
-        </div><hr>`;
-        return cartRow;
-
-    }
-    renderShopItemEntry(data,price){
-        let itemEntry = `<div class="grid-item">
-            <div class="card">
-            <img src="${data.image}" height="auto" width="200px"></img>
-                <div class="card-body">
-                    <h5 class="card-title">${data.title}</h5>
-                    <p class="card-text">${data.description}</p>
-                    <p class="card-text">${this._currencySymbol}  ${price.toFixed(2)}</p>
-                    <button class="btn btn-success add-to-cart-button" id="${data.id}" onclick="addToCart(${data.id}); openNav();">
-                    Add to Cart</button>
-                </div>
-            </div>
-        </div>`;
-        return itemEntry;
-    }
-    getCurrency(){
-        let selectValue = $("#selectCurrency :selected").val(); 
-        let data = fetch("https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies/cad.json").
-        then(response => response.json()).
-            then((json) => { 
-                this._testCurrency = json["cad"][selectValue];
-                return json["cad"][selectValue];
-            });
-        return data;
-    }
-    addDivFooter(){
-        $('#totalAmount').append(`<div class="row shopping-list">
-        <div class="col-lg-2 shopping-list ">
-        </div>
-        <div class="col-lg-4 shopping-list ">
-        <button type="button" class="btn btn-warning" onclick="emptyCart()">Empty Cart</button>
-        </div>
-        <div class="col-lg-1 shopping-list ">
-        </div>
-        <div class="col-lg-1 shopping-list ">
-        </div>
-        <div class="col-lg-4 shopping-list" id="totalPrice">
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#checkoutModal" onclick="renderOrderSummary()"id="checkoutButton">
-        Checkout
-    </button>
-        </div>
-        <hr class = "shopping-list">
-        </div>`);
-    }
-    get_total(totalPrice){
-        $('#totalAmount').append(`<div class="row shopping-list">
-        <div class="col-lg-2 shopping-list ">
-        </div>
-        <div class="col-lg-3 shopping-list ">
-        Subtotal
-        </div>
-        <div class="col-lg-2 shopping-list ">
-        </div>
-        <div class="col-lg-2 shopping-list ">
-        </div>
-        <div class="col-lg-3 shopping-list" id="totalPrice">
-        <p id="symbol"> ${this._currencySymbol} ${totalPrice} </p>
-        </div>
-        <hr class = "shopping-list">
-        </div>`);
-    }
-    renderEmptyCart(){
-        $('#cartContainer').append(`<div class="row"> 
-                <div class="col-lg-12  shopping-list">
-                  <center> No items in cart </center>
-                </div>
-            </div>`);
-    }
-    renderEmptySummary(){
-        $('#summaryBody').empty();
-        $('#summaryBody').append(`<div class="row"> 
-        <div class="col-lg-12 ">
-          <center> No items in added </center>
-        </div>
-    </div>`);
-    }
-    summaryHeader(){
-        $('#summaryBody').append(`<div class="row">
-            <div class="col-lg-5 ">
-            Item    
-            </div>
-            <div class="col-lg-1 ">
-            Qty
-            </div>
-            <div class="col-lg-3 ">
-            Price
-            </div>
-            <div class="col-lg-3 ">
-            Total
-            </div>
-        </div> <hr class="class-1" >`);   
-    }
-    summaryGrandTotal(total, currency, taxRate){
-        let shippingFee = 15 * currency;
-        let tax = total * (taxRate/100);
-        let grandTotal = parseFloat(tax.toFixed(2)) + parseFloat(shippingFee.toFixed(2)) + parseFloat(total);
-        $('#summaryBody').append(`
-        <div class="row summation">
-            <div class="col-lg-5 ">
-            Subtotal 
-            </div>
-            <div class="col-lg-1 ">
-           
-            </div>
-            <div class="col-lg-3 ">
-          
-            </div>
-            <div class="col-lg-3 ">
-            <p id="symbol"> ${this._currencySymbol}  ${total}</p>
-            </div>
-        </div> <hr>
-        <div class="row summation">
-            <div class="col-lg-5 ">
-            Shipping 
-            </div>
-            <div class="col-lg-1 ">
-           
-            </div>
-            <div class="col-lg-3 ">
-          
-            </div>
-            <div class="col-lg-3 ">
-            <p id="symbol"> ${this._currencySymbol}  ${shippingFee.toFixed(2)}</p>
-            </div>
-        </div> <hr>
-        <div class="row summation">
-            <div class="col-lg-5 ">
-            Tax ${taxRate}%
-            </div>
-            <div class="col-lg-1 ">
-           
-            </div>
-            <div class="col-lg-3 ">
-          
-            </div>
-            <div class="col-lg-3 ">
-            
-            <p id="symbol"> ${this._currencySymbol}  ${tax.toFixed(2)}</p>
-            </div>
-        </div> <hr>
-        <div class="row summation">
-            <div class="col-lg-5 ">
-            Order Total 
-            </div>
-            <div class="col-lg-1 ">
-           
-            </div>
-            <div class="col-lg-3 ">
-          
-            </div>
-            <div class="col-lg-3 ">
-            <p id="symbol"> ${this._currencySymbol}  ${grandTotal}</p>
-            </div>
-        </div> <hr>`);   
-    }
-
-
+function submitOrder(){
+    jsonData = { 
+            card_number: $("#formCardNumber").val(),
+            expiry_month: $("#expiryMonth").val(),
+            expiry_year: $("#expiryYear").val(),
+            security_code: $("#formCVV").val(),
+            amount: parseFloat($("#total").text()) ,
+            taxes: parseFloat($("#taxRate").text()),
+            shipping_amount: parseFloat($("#shippingFee").text()),
+            currency: 'cad',
+            items: get_cookie("cartList"),
+            billing: {
+                first_name: $("#firstName").val(),
+                last_name: $("#lastName").val(),
+                address_1: $("#address").val(),
+                address_2: $("#address2").val(),
+                city: $("#city").val(),
+                province: $("#state").val(),
+                country: $("#country").val(),
+                postal: $("#zip").val(),
+                phone: $("#phone").val(),
+                email: $("#email").val()
+            },
+            shipping: {
+                first_name: $("#s_firstName").val(),
+                last_name: $("#s_lastName").val(),
+                address_1: $("#s_address").val(),
+                address_2: $("#s_address2").val(),
+                city: $("#s_city").val(),
+                province: $("#s_state").val(),
+                country: $("#s_country").val(),
+                postal: $("#s_zip").val(),
+            }
+        };
+        let form_data = new FormData();
+        form_data.append('submission', JSON.stringify(jsonData));  
+        fetch('https://deepblue.camosun.bc.ca/~c0180354/ics128/final/', 
+        { method: "POST", 
+            cache: 'no-cache', 
+            body: form_data
+        }).then(response => response.json()).
+        then((json) => {
+           if(json['status'] == "SUCCESS"){
+            $("#currentNav").val("1");
+            swal("Order Confirmed", "Thank you for shopping with us", "success");
+            set_cookie("cartList", {}); 
+            loadData();
+            populateCart();
+           }
+           else{
+            swal("Order Not Completed", json['status'], "error");
+           }
+        });
+    
+    
 }
-
-
 
 //listeners
 function event_listeners(){
     $("#shipping").hide();
-    let checkOutForm = new formValidation();
+
     $('#sameShipping').click(function() {
         $("#shipping").toggle(this.notchecked);
-        if(document.getElementById('sameShipping').checked && validateBillingTab() == 1) {
-            $("#pMethod3").remove("");
-            $("#nav3").append("<label id='pMethod3'>✅</label>");
-        }
-        else if(!document.getElementById('sameShipping').checked){
-            validateShippingTab();
-        }
+        let billing = validateBillingTab();
+        checkOutForm.checkShipping(billing);
+        validateShippingTab();
         
     });
     $('#checkoutModal').on('hidden.bs.modal', function () {
         $("#currentNav").val("1");
-        console.log($("#currentNav").val());
+        $("#confirmOrder").html("Continue");
+        $("#confirmOrder").removeAttr("onClick");
+         $("#confirmOrder").removeAttr("data-bs-dismiss");
+        $("#nav1").empty();
+        $("#nav1").append(`<i class="bi bi-credit-card-2-back"></i>Payment Method</button>`);
+        $("#nav2").empty();
+        $("#nav2").append(`<i class="bi bi-house-door"></i>Billing Details</button>`);
+        $("#nav3").empty();
+        $("#nav3").append(`<i class="bi bi-patch-check"></i> Order Confirmation</button>`);
+  
     });
     $("#selectCurrency").on('change', function (e) {
-        $("#cartContainer").empty();
-        $("#totalAmount").empty();
         populateCart();
         loadData();
     });
@@ -523,6 +342,8 @@ function event_listeners(){
             $(`#nav2`).prop('aria-selected', false);
             $(`#nav3`).prop('aria-selected', true);
             $(`#nav4`).prop('aria-selected', false);
+            let billing = validateBillingTab();
+            checkOutForm.checkShipping(billing);
             validateShippingTab();
         }
         else if(currentNav == 4){
@@ -536,21 +357,30 @@ function event_listeners(){
             currentNav = parseInt(currentNav) + 1;
         }
         $("#currentNav").val(currentNav);
+        console.log(currentNav);
         if(currentNav == 4){
-          
+        //ALWAYS ENABLE CHECKOUT
             $("#confirmOrder").prop('disabled', true);
             validateAllTabs();
             $("#confirmOrder").html("Complete Order Now");
+            $("#confirmOrder").attr({
+                'onClick' : 'submitOrder();',
+                'data-bs-dismiss' : 'modal'
+
+            });
+      
         }
-        console.log(currentNav);
         var sel = document.querySelector(`#nav${currentNav}`);
         bootstrap.Tab.getOrCreateInstance(sel).show(); 
     });
-     $('.checkout-fields').on('blur',function (event) {
+
+    //event listener when the cursor is moved from the current input/form element 
+     $('.checkout-fields').on('blur', async function (event) {
         let elemID = event.target.id;
         let result;
+        //gets the validity by passing the value for testing on the appropriate class method method and then putting the result on result variable
         if(elemID == "formCardNumber"){
-            result = checkOutForm.validateCard($(`#${elemID}`).val());
+            result = await checkOutForm.validateCard($(`#${elemID}`).val());
         }
         else if(elemID == "expiryMonth"){
             result = checkOutForm.validateMonth($(`#${elemID}`).val());
@@ -575,11 +405,14 @@ function event_listeners(){
         else if(elemID == "phone"){
             result = checkOutForm.validatePhone($(`#${elemID}`).val());
         }
-        else if(elemID == "address" || elemID == "city" || elemID == "state" ){
+        else if(elemID == "address" || elemID == "s_address" ){
+            result = checkOutForm.validateAddress($(`#${elemID}`).val());
+        }
+        else if( elemID == "s_state"  || elemID == "state" ){
             result = checkOutForm.validateBlank($(`#${elemID}`).val());
         }
-        else if(elemID == "s_address"|| elemID == "s_city" || elemID == "s_state"  ){
-            result = checkOutForm.validateBlank($(`#${elemID}`).val());
+        else if( elemID == "city" || elemID == "s_city"){
+            result = checkOutForm.validateCity($(`#${elemID}`).val());
         }
         else if(elemID == "s_zip"){
             result = checkOutForm.validateZip(     
@@ -596,11 +429,13 @@ function event_listeners(){
             validateBillingTab();
         }
         if(result !== undefined){
+            //passes the validation reports for consolidation
             checkOutForm.validationReport(elemID, result);
         }
     });
 
     function validatePaymentTab(){
+        //validates the whole payment tab/ Updates the tab icon once everything is valid
         let IDs = [];
         $("#paymentInfo").find("input").each(function(){ IDs.push(this.id); });
         let count = 0;
@@ -623,6 +458,7 @@ function event_listeners(){
         return result;
     }
     function validateBillingTab(){
+          //validates the whole billing tab. Updates the tab icon once everything is valid
         let IDs = [];
         $("#billingInfo").find("input").each(function(){ IDs.push(this.id); });
         let count = 0;
@@ -632,8 +468,7 @@ function event_listeners(){
                 count++;
             }
         }
-        //test
-        result = 0;
+        let result = 0;
         if(count == 7){
             $("#pMethod2").remove("");
             $("#nav2").append("<label id='pMethod2'>✅</label>");
@@ -647,6 +482,7 @@ function event_listeners(){
     }
     function validateShippingTab(){
         let result = 0;
+        //updates tab icons depending on the validity of entered information
         if(document.getElementById('sameShipping').checked && validateBillingTab() == 1) {
             $("#pMethod3").remove("");
             $("#nav3").append("<label id='pMethod3'>✅</label>");
@@ -678,6 +514,7 @@ function event_listeners(){
         }
         return result;
     }
+    //enables the confirm order button once all fields are valid
     function validateAllTabs(){
         let result = 0;
         if(validateShippingTab() == 1 && validateBillingTab() == 1 && validatePaymentTab() == 1){
@@ -687,108 +524,11 @@ function event_listeners(){
         else{
             $("#confirmOrder").prop('disabled', true);
         }
-        console.log(result);
         return result;
 
     }
 }
-class formValidation{
-    constructor(){
-        this._validity = {};
-    }
-    validateCard(data){
-        if(!/^3[47][0-9]{13}$/.test(data) && 
-        !/^4[0-9]{12}(?:[0-9]{3})?$/.test(data) && 
-        !/^(?:4[0-9]{12}(?:[0-9]{3})?|5[1-5][0-9]{14})$/.test(data) && 
-        !/^(5[1-5][0-9]{14}|2(22[1-9][0-9]{12}|2[3-9][0-9]{13}|[3-6][0-9]{14}|7[0-1][0-9]{13}|720[0-9]{12}))$/.test(data)){
-            return 0;
-        }
-        else{
-            return 1;
-        }
-    }
-    validateMonth(data){
-        if(!/^(0?[1-9]|1[012])$/.test(data)){
-            return 0
-        }
-        else{
-            return 1;
-        }
-    }
-    validateYear(data){
-        if(!/\b(20[2-4][0-9]|50)\b/.test(data)){
-            return 0
-        }
-        else{
-            return 1;
-        }
-    }
-    validateCVV(data){
-        if(!/[0-9]\d\d/g.test(data)){
-            return 0
-        }
-        else{
-            return 1;
-        }
-    }
-    validateName(data){
-        if(!/^[a-zA-Z ]{2,30}$/.test(data)){
-            return 0;
-        }
-        else{
-            return 1;
-        }
-    }
-    validateEmail(data){
-        if(!/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(data)){
-            return 0;
-        }else{
-            return 1;
-        }
-    }
-    validatePhone(data){
-        if(!/^\(?([0-9]{3})\)?[- ]?([0-9]{3})[- ]?([0-9]{4})$/.test(data)){
-            return 0;
-        }else{ 
-            return 1;
-        }
-    }
-    validateBlank(data){
-        if(data == "" || data === undefined){
-            return 0;
-        }else{
-            return 1;
-        }
-    }
-    validateZip(data, country){
-        let result = 1;
-        if(country == "canada"){
-            if(!/^[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z][ -]?\d[ABCEGHJ-NPRSTV-Z]\d$/i.test(data)){
-                result = 0;
-            }
-        }else if(country == "usa"){
-            if(!/^[0-9]{5}(?:-[0-9]{4})?$/.test(data)){
-                result = 0;
-            }
-        }
-       return result;
-    }
-    validationReport(elemID, result){
-        if(result == 1){
-            $(`#${elemID}`).addClass("is-valid");
-            $(`#${elemID}`).removeClass("is-invalid");
-            this._validity[elemID] = 1;
-        }else{
-            $(`#${elemID}`).addClass("is-invalid");
-            $(`#${elemID}`).removeClass("is-valid");
-            this._validity[elemID] = 0;
-        }
-    }
-    checkSumValidity(){
-        return this._validity;
-    }
-   
-}
+
 function usStates(){
     states = {"AL":"Alabama","AK":"Alaska","AZ":"Arizona","AR":"Arkansas","CA":"California","CO":"Colorado","CT":"Connecticut","DE":"Delaware","FL":"Florida","GA":"Georgia","HI":"Hawaii","ID":"Idaho","IL":"Illinois","IN":"Indiana","IA":"Iowa","KS":"Kansas","KY":"Kentucky","LA":"Louisiana","ME":"Maine","MD":"Maryland","MA":"Massachusetts","MI":"Michigan","MN":"Minnesota","MS":"Mississippi","MO":"Missouri","MT":"Montana","NE":"Nebraska","NV":"Nevada","NH":"New Hampshire","NJ":"New Jersey","NM":"New Mexico","NY":"New York","NC":"North Carolina","ND":"North Dakota","OH":"Ohio","OK":"Oklahoma","OR":"Oregon","PA":"Pennsylvania","RI":"Rhode Island","SC":"South Carolina","SD":"South Dakota","TN":"Tennessee","TX":"Texas","UT":"Utah","VT":"Vermont","VA":"Virginia","WA":"Washington","WV":"West Virginia","WI":"Wisconsin","WY":"Wyoming"};
     return states;
